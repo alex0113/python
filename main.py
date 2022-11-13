@@ -1,8 +1,13 @@
 from reddit_interface import RedditInterface
 from finance_utils import TickerProcessor 
+from mail_sender import EmailSender
+from report_generator import genReport
+
 import timeit
 
-MINIMUM_POST_SCORE = 10
+SKIP_WORDS_FILE = "SkipWords.txt"
+MINIMUM_POST_SCORE = 20
+TICKER_POPULARITY_THRESHOLD = 3
 
 def filter_post(post):
     if post.score < MINIMUM_POST_SCORE:
@@ -10,11 +15,17 @@ def filter_post(post):
     return False
 
 def main():
-    start = timeit.timeit()
+    start = timeit.default_timer()
+
+
 
     print("Hello World!")
+
+    f = open(SKIP_WORDS_FILE, "r")
+    skipWords = f.read().split()
+
     reddit = RedditInterface()
-    ticketProcessor = TickerProcessor()
+    ticketProcessor = TickerProcessor(TICKER_POPULARITY_THRESHOLD, skipWords)
     posts = reddit.fetchTodayPosts("wallstreetbets")
 
     posts_dict = {}
@@ -30,13 +41,20 @@ def main():
         ticketProcessor.parseTickers(post.title)
         ticketProcessor.parseTickers(post.selftext)
 
-        ticketProcessor.dump()
     ticketProcessor.dump()
+    rez = ticketProcessor.fetchEnrichedValidTickers()
+    for ticket in rez:
+        print(ticket)
 
 
     print(f'Fetched {count} number of posts. Kept {len(posts_dict)} posts')
 
-    end = timeit.timeit()
+    report = genReport(rez)
+    emailSender = EmailSender()
+    emailSender.sendEmail(report)
+
+
+    end = timeit.default_timer()
     print(end - start)
 
 if __name__ == "__main__":
